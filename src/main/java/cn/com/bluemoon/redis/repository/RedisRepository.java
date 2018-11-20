@@ -371,6 +371,32 @@ public class RedisRepository {
             return connection.decr(redisSerializer.serialize(key));
         });
     }
+    
+    /**
+     * 自增指定的长度
+     * @param key
+     * @param increment
+     * @return
+     */
+    public long incrBy(final String key, long increment) {
+    	return redisTemplate.execute((RedisCallback<Long>) connection -> {
+            RedisSerializer<String> redisSerializer = getRedisSerializer();
+            return connection.incrBy(redisSerializer.serialize(key), increment);
+        });
+    }
+    
+    /**
+     * 自减指定的长度
+     * @param key
+     * @param decrement
+     * @return
+     */
+    public long decrBy(final String key, long decrement) {
+    	return redisTemplate.execute((RedisCallback<Long>) connection -> {
+            RedisSerializer<String> redisSerializer = getRedisSerializer();
+            return connection.decrBy(redisSerializer.serialize(key), decrement);
+        });
+    }
 
     /**
      * redis List 引擎

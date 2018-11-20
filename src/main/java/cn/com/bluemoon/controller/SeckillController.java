@@ -21,6 +21,7 @@ import com.alibaba.fastjson.JSONObject;
 
 import cn.com.bluemoon.common.response.BaseResponse;
 import cn.com.bluemoon.common.response.SeckillInfoResponse;
+import cn.com.bluemoon.common.response.StockNumResponse;
 import cn.com.bluemoon.redis.repository.RedisRepository;
 import cn.com.bluemoon.service.ISeckillService;
 import cn.com.bluemoon.utils.AssertUtil;
@@ -55,12 +56,32 @@ public class SeckillController {
 	@ApiOperation(value="设置活动库存",nickname="Guoqing")
 	@RequestMapping(value="/setStockNum", method=RequestMethod.POST)
 	public BaseResponse setStockNum(@RequestBody JSONObject jsonObject) {
+		
 		int stockNum = jsonObject.containsKey("stockNum")?jsonObject.getInteger("stockNum"):0;
 		int stallActivityId = jsonObject.containsKey("stallActivityId") ? jsonObject.getInteger("stallActivityId") : -1;
 		AssertUtil.isTrue(stallActivityId != -1, "非法参数");
-		redisRepository.set("BM_MARKET_SECKILL_STOCKNUM_" + stallActivityId, Integer.toString(stockNum));
-		redisRepository.set("BM_MARKET_SECKILL_REAL_STOCKNUM_" + stallActivityId, Integer.toString(stockNum));
+		redisRepository.incrBy("BM_MARKET_SECKILL_STOCKNUM_" + stallActivityId, stockNum);
+		redisRepository.incrBy("BM_MARKET_SECKILL_REAL_STOCKNUM_" + stallActivityId, stockNum);
+		
 		return new BaseResponse();
+	}
+	
+	/**
+	 * 查看活动库存情况
+	 * @param jsonObject
+	 * @return
+	 */
+	@ApiOperation(value="查看活动库存",nickname="Guoqing")
+	@RequestMapping(value="/getStockNum", method=RequestMethod.POST)
+	public StockNumResponse getStockNum(@RequestBody JSONObject jsonObject) {
+		StockNumResponse response = new StockNumResponse();
+		int stallActivityId = jsonObject.containsKey("stallActivityId") ? jsonObject.getInteger("stallActivityId") : -1;
+		AssertUtil.isTrue(stallActivityId != -1, "非法参数");
+		String stockNum = redisRepository.get("BM_MARKET_SECKILL_STOCKNUM_" + stallActivityId);
+		String realStockNum = redisRepository.get("BM_MARKET_SECKILL_REAL_STOCKNUM_" + stallActivityId);
+		response.setStockNum(Long.parseLong(stockNum));
+		response.setRealStockNum(Long.parseLong(realStockNum));
+		return response;
 	}
 
 	/**

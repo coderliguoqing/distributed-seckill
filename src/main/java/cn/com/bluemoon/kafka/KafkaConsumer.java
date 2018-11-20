@@ -28,6 +28,7 @@ public class KafkaConsumer {
 	
     /**
      * 监听seckill主题,有消息就读取
+     * 主要消费秒杀进入到下订单操作的队列数据，此处的数据已经过滤了绝大部分请求，只有真正得到下单机会的用户才会进入到这一环节
      * @param message
      */
     @KafkaListener(topics = {"demo_seckill"})
@@ -57,10 +58,7 @@ public class KafkaConsumer {
 			try{
 				lock.lock();
 				//扣减真实库存
-				String redisRealStock = redisRepository.get("BM_MARKET_SECKILL_REAL_STOCKNUM_" + stallActivityId);
-				int realStock = Integer.parseInt(redisRealStock == null ? "0" : redisRealStock);	//剩余的真实库存 
-				realStock = realStock - purchaseNum;
-				redisRepository.set("BM_MARKET_SECKILL_REAL_STOCKNUM_" + stallActivityId, Integer.toString(realStock));
+				redisRepository.decrBy("BM_MARKET_SECKILL_REAL_STOCKNUM_" + stallActivityId, purchaseNum);
 			}finally{
 				lock.unlock();
 			}

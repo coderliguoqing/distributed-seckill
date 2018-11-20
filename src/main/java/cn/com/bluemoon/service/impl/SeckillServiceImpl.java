@@ -68,8 +68,7 @@ public class SeckillServiceImpl implements ISeckillService {
 				if( surplusStock >= purchaseNum ) {
 					try {
 						//锁定库存，并将请求放入消费队列
-						surplusStock = surplusStock - purchaseNum;
-						redisRepository.set("BM_MARKET_SECKILL_STOCKNUM_" + stallActivityId, Integer.toString(surplusStock));
+						redisRepository.decrBy("BM_MARKET_SECKILL_STOCKNUM_" + stallActivityId, purchaseNum);
 						JSONObject jsonStr = new JSONObject();
 						jsonStr.put("stallActivityId", stallActivityId);
 						jsonStr.put("purchaseNum", purchaseNum);
