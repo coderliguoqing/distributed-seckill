@@ -32,4 +32,11 @@ public interface ISeckillService {
 	public SeckillInfoResponse startSeckill(int stallActivityId, int purchaseNum, String openId, String formId,
 			long addressId, String shareCode, String shareSource, String userCode );
 	
+	/**
+	 * 判断秒杀活动是否已经开始
+	 * @param stallActivityId
+	 * @return
+	 */
+	public boolean checkStartSeckill(int stallActivityId);
+	
 }

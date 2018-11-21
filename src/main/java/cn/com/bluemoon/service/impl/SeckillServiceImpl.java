@@ -8,6 +8,8 @@
 */  
 package cn.com.bluemoon.service.impl;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -36,6 +38,8 @@ public class SeckillServiceImpl implements ISeckillService {
 	private StringRedisTemplate redisTemplate;
 	@Autowired
 	private KafkaSender kafkaSender;
+	
+	private Logger logger = LoggerFactory.getLogger(SeckillServiceImpl.class);
 
 	@Override
 	@Transactional
@@ -50,13 +54,16 @@ public class SeckillServiceImpl implements ISeckillService {
 			response.setRefreshTime(0);
 			return response;
 		}
+		logger.info("开始获取锁资源...");
 		DistributedExclusiveRedisLock lock = new DistributedExclusiveRedisLock(redisTemplate); //构造锁的时候需要带入RedisTemplate实例
 		lock.setLockKey("BM_MARKET_SECKILL_" + stallActivityId);		//控制锁的颗粒度
 		lock.setExpires(2L);	//每次操作预计的超时时间,单位秒
 		try {
 			lock.lock();    //获取锁
+			logger.info("获取到锁资源...");
 			//做用户重复购买校验
 			if( redisRepository.exists("BM_MARKET_SECKILL_LIMIT_" + stallActivityId + "_" + openId) ) {
+				logger.info("已经检测到用户重复购买...");
 				response.setIsSuccess(false);
 				response.setResponseCode(6105);
 				response.setResponseMsg("您正在参与该活动，不能重复购买");
@@ -121,6 +128,7 @@ public class SeckillServiceImpl implements ISeckillService {
 			response.setResponseMsg("秒杀失败，商品已经售罄");
 			response.setRefreshTime(0);
 		} finally {
+			logger.info("开始释放锁资源...");
 			lock.unlock();  //释放锁
 		}
 		return response;
@@ -133,6 +141,7 @@ public class SeckillServiceImpl implements ISeckillService {
 	 * @param stallActivityId
 	 * @return
 	 */
+	@Override
 	public boolean checkStartSeckill(int stallActivityId) {
 		//此处已经省略了业务代码，良好的操作时应该将秒杀活动的开始时间在新增/编辑主数据的是维护到redis中，并维护好key值，此处取出，然后做出判断
 		//默认为开始了

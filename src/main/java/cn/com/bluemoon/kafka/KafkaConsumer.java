@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import com.alibaba.fastjson.JSONObject;
 
+import cn.com.bluemoon.common.response.SeckillInfoResponse;
 import cn.com.bluemoon.redis.lock.DistributedExclusiveRedisLock;
 import cn.com.bluemoon.redis.repository.RedisRepository;
 import cn.com.bluemoon.utils.SerialNo;
@@ -64,6 +65,56 @@ public class KafkaConsumer {
 			}
 		} catch (NumberFormatException e) {
 			e.printStackTrace();
+		}
+    }
+    
+    /**
+     * 与上述方法不同，该方法还包含库存校验等逻辑操作
+     */
+    @KafkaListener(topics = {"demo_seckill_queue"})
+    public void receiveMessage2(String message) {
+    	JSONObject json = JSONObject.parseObject(message);
+		long stallActivityId = json.getLong("stallActivityId");
+		int purchaseNum = json.getInteger("purchaseNum");
+		String openId = json.getString("openId");
+//		long addressId = json.getLong("addressId");
+//		String formId = json.getString("formId");
+//		String shareCode = json.getString("shareCode");
+//		String shareSource = json.getString("shareSource");
+//		String userCode = json.getString("userCode");
+		
+		DistributedExclusiveRedisLock lock = new DistributedExclusiveRedisLock(redisTemplate); //构造锁的时候需要带入RedisTemplate实例
+		lock.setLockKey("marketOrder"+stallActivityId); //控制锁的颗粒度(摊位活动ID)
+		lock.setExpires(1L); //每次操作预计的超时时间,单位秒
+		try{
+			lock.lock();
+			JSONObject result = new JSONObject();
+			SeckillInfoResponse response = new SeckillInfoResponse();
+			String redisStock = redisRepository.get("BM_MARKET_SECKILL_STOCKNUM_" + stallActivityId);
+			int surplusStock = Integer.parseInt(redisStock == null ? "0" : redisStock);	//剩余库存
+			//如果剩余库存大于购买数量，则获得下单资格，并生成唯一下单资格码
+			if( surplusStock >= purchaseNum ) {
+				response.setIsSuccess(true);
+				response.setResponseCode(0);
+				response.setResponseMsg("您已获得下单资格，请尽快下单");
+				response.setRefreshTime(0);
+				String code = SerialNo.getUNID();
+				response.setOrderQualificationCode(code);
+				//将下单资格码维护到redis中，用于下单时候的检验；有效时间10分钟；
+				redisRepository.setExpire("BM_MARKET_SECKILL_QUALIFICATION_CODE_" + stallActivityId + "_" + openId, code, 10*60);
+				//维护一个key，防止获得下单资格用户重新抢购，当支付过期之后应该维护删除该标志
+				redisRepository.setExpire("BM_MARKET_SECKILL_LIMIT_" + stallActivityId + "_" + openId, "true", 3600*24*7);
+			}else {
+				response.setIsSuccess(false);
+				response.setResponseCode(6102);
+				response.setResponseMsg("秒杀失败，商品已经售罄");
+				response.setRefreshTime(0);
+			}
+			result.put("response", response);
+			//将信息维护到redis中
+			redisRepository.setExpire("BM_MARKET_SECKILL_QUEUE_"+stallActivityId+"_"+openId, result.toJSONString(), 3600*24*7);
+		}finally{
+			lock.unlock();
 		}
     }
     

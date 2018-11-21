@@ -8,6 +8,7 @@
 */  
 package cn.com.bluemoon.controller;
 
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +23,7 @@ import com.alibaba.fastjson.JSONObject;
 import cn.com.bluemoon.common.response.BaseResponse;
 import cn.com.bluemoon.common.response.SeckillInfoResponse;
 import cn.com.bluemoon.common.response.StockNumResponse;
+import cn.com.bluemoon.kafka.KafkaSender;
 import cn.com.bluemoon.redis.repository.RedisRepository;
 import cn.com.bluemoon.service.ISeckillService;
 import cn.com.bluemoon.utils.AssertUtil;
@@ -45,6 +47,8 @@ public class SeckillController {
 	private RedisRepository redisRepository;
 	@Autowired
 	private ISeckillService seckillService;
+	@Autowired
+	private KafkaSender kafkaSender;
 
 	Logger logger = LoggerFactory.getLogger(SeckillController.class);
 	
@@ -86,12 +90,13 @@ public class SeckillController {
 
 	/**
 	 * 06.04-去秒杀，创建秒杀订单
+	 * 通过分布式锁的方式控制，控制库存不超卖
 	 * <p>Title: testSeckill</p>  
 	 * <p>Description: 秒杀下单</p>  
 	 * @param jsonObject
 	 * @return
 	 */
-	@ApiOperation(value="去秒杀",nickname="Guoqing")
+	@ApiOperation(value="去秒杀--先分布式锁模式",nickname="Guoqing")
 	@RequestMapping(value="/goSeckill", method=RequestMethod.POST)
 	public SeckillInfoResponse goSeckill(@RequestBody JSONObject jsonObject) {
 		int stallActivityId = jsonObject.containsKey("stallActivityId") ? jsonObject.getInteger("stallActivityId") : -1;		//活动Id
@@ -113,13 +118,58 @@ public class SeckillController {
 	}
 	
 	/**
+	 * 秒杀接口，先将请求放入队列模式
+	 * @param jsonObject
+	 * @return
+	 */
+	@ApiOperation(value="去秒杀--先队列模式",nickname="Guoqing")
+	@RequestMapping(value="/goSeckillByQueue", method=RequestMethod.POST)
+	public BaseResponse goSeckillByQueue(@RequestBody JSONObject jsonObject) {
+		int stallActivityId = jsonObject.containsKey("stallActivityId") ? jsonObject.getInteger("stallActivityId") : -1;		//活动Id
+		AssertUtil.isTrue(stallActivityId != -1, "非法參數");
+		int purchaseNum = jsonObject.containsKey("purchaseNum") ? jsonObject.getInteger("purchaseNum") : 1;		//购买数量
+		AssertUtil.isTrue(purchaseNum != -1, "非法參數");
+		String openId = jsonObject.containsKey("openId") ? jsonObject.getString("openId") : null;
+		AssertUtil.isTrue(!StringUtil.isEmpty(openId), 1101, "非法參數");
+		String formId = jsonObject.containsKey("formId") ? jsonObject.getString("formId") : null;
+		AssertUtil.isTrue(!StringUtil.isEmpty(formId), 1101, "非法參數");
+		long addressId = jsonObject.containsKey("addressId") ? jsonObject.getLong("addressId") : -1;
+		AssertUtil.isTrue(addressId != -1, "非法參數");
+		//通过分享入口进来的参数
+		String shareCode =  jsonObject.getString("shareCode");
+		String shareSource =  jsonObject.getString("shareSource");
+		String userCode =  jsonObject.getString("userId");
+		
+		JSONObject jsonStr = new JSONObject();
+		jsonStr.put("stallActivityId", stallActivityId);
+		jsonStr.put("purchaseNum", purchaseNum);
+		jsonStr.put("openId", openId);
+		jsonStr.put("addressId", addressId);
+		jsonStr.put("formId", formId);
+		jsonStr.put("shareCode", shareCode);
+		jsonStr.put("shareSource", shareSource);
+		jsonStr.put("userCode", userCode);
+		//判断秒杀活动是否开始
+		if( !seckillService.checkStartSeckill(stallActivityId) ) {
+			return new BaseResponse(false, 6205, "秒杀活动尚未开始，请稍等！");
+		}
+		//做用户重复购买校验
+		if( redisRepository.exists("BM_MARKET_SECKILL_LIMIT_" + stallActivityId + "_" + openId) ) {
+			return new BaseResponse(false, 6105, "您正在参与该活动，不能重复购买！");
+		}
+		//放入kafka消息队列
+		kafkaSender.sendChannelMess("demo_seckill_queue", jsonStr.toString());
+		return new BaseResponse();
+	}
+	
+	/**
 	 * 06.05-轮询请求当前用户是否秒杀下单成功
 	 * <p>Title: seckillPolling</p>  
 	 * <p>Description: </p>  
 	 * @param jsonObject
 	 * @return
 	 */
-	@ApiOperation(value="轮询接口",nickname="Guoqing")
+	@ApiOperation(value="轮询接口--先分布式锁模式",nickname="Guoqing")
 	@RequestMapping(value="/seckillPolling", method=RequestMethod.POST)
 	public SeckillInfoResponse seckillPolling(@RequestBody JSONObject jsonObject) {
 		int stallActivityId = jsonObject.containsKey("stallActivityId") ? jsonObject.getInteger("stallActivityId") : -1;		//活动Id
@@ -154,4 +204,55 @@ public class SeckillController {
 		return response;
 	}
 	
+	/**
+	 * 轮询请求  判断是否获得下单资格
+	 * @param jsonObject
+	 * @return
+	 */
+	@ApiOperation(value="轮询接口--先队列模式",nickname="Guoqing")
+	@RequestMapping(value="/seckillPollingQueue", method=RequestMethod.POST)
+	public SeckillInfoResponse seckillPollingQueue(@RequestBody JSONObject jsonObject) {
+		int stallActivityId = jsonObject.containsKey("stallActivityId") ? jsonObject.getInteger("stallActivityId") : -1;		//活动Id
+		AssertUtil.isTrue(stallActivityId != -1, "非法參數");
+		String openId = jsonObject.containsKey("openId") ? jsonObject.getString("openId") : null;
+		AssertUtil.isTrue(!StringUtil.isEmpty(openId), 1101, "非法參數");
+		
+		SeckillInfoResponse response = new SeckillInfoResponse();
+		//是否存在下单资格码的key
+		if( redisRepository.exists("BM_MARKET_SECKILL_QUEUE_"+stallActivityId+"_"+openId) ){
+			String result = redisRepository.get("BM_MARKET_SECKILL_QUEUE_"+stallActivityId+"_"+openId);
+			response = JSONObject.parseObject(JSONObject.parseObject(result).getJSONObject("response").toJSONString(), SeckillInfoResponse.class);
+		} else {
+			response.setIsSuccess(false);
+			response.setResponseCode(6102);
+			response.setResponseMsg("秒杀失败，商品已经售罄");
+			response.setRefreshTime(0);
+		}
+		return response;
+	}
+	
+	/**
+	 * 根据获取到的下单资格码创建订单
+	 * @param jsonObject
+	 * @return
+	 */
+	@ApiOperation(value="先队列模式--下单接口",nickname="Guoqing")
+	@RequestMapping(value="/createOrder", method=RequestMethod.POST)
+	public BaseResponse createOrder(@RequestBody JSONObject jsonObject) {
+		int stallActivityId = jsonObject.containsKey("stallActivityId") ? jsonObject.getInteger("stallActivityId") : -1;		//活动Id
+		AssertUtil.isTrue(stallActivityId != -1, "非法參數");
+		String openId = jsonObject.containsKey("openId") ? jsonObject.getString("openId") : null;
+		AssertUtil.isTrue(!StringUtil.isEmpty(openId), 1101, "非法參數");
+		String orderQualificationCode = jsonObject.containsKey("orderQualificationCode") ? jsonObject.getString("orderQualificationCode") : null;
+		AssertUtil.isTrue(!StringUtil.isEmpty(orderQualificationCode), 1101, "非法參數");
+		
+		//校验下单资格码
+		String redisQualificationCode = redisRepository.get("BM_MARKET_SECKILL_QUALIFICATION_CODE_" + stallActivityId + "_" + openId);
+		if(StringUtils.isEmpty(redisQualificationCode) || !orderQualificationCode.equals(redisQualificationCode) ) {
+			return new BaseResponse(false, 6305, "您的资格码已经过期！");
+		}else {
+			//走后续的下单流程，并校验真实库存；该接口的流量已经是与真实库存几乎相匹配的流量值，按理不应该存在超高并发
+			return new BaseResponse();
+		}
+	}
 }

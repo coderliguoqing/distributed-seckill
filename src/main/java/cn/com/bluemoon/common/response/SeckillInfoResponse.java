@@ -21,6 +21,7 @@ public class SeckillInfoResponse extends BaseResponse {
 	private int refreshTime;	//下一次请求刷新时间
 	private long orderId;		//订单ID
 	private String orderCode;	//订单编码
+	private String orderQualificationCode;  //下单资格码
 	/**
 	 * @return the refreshTime
 	 */
@@ -56,6 +57,12 @@ public class SeckillInfoResponse extends BaseResponse {
 	 */
 	public void setOrderCode(String orderCode) {
 		this.orderCode = orderCode;
+	}
+	public String getOrderQualificationCode() {
+		return orderQualificationCode;
+	}
+	public void setOrderQualificationCode(String orderQualificationCode) {
+		this.orderQualificationCode = orderQualificationCode;
 	}
 	
 	
