@@ -113,6 +113,17 @@ public class SeckillController {
 		String shareCode =  jsonObject.getString("shareCode");
         String shareSource =  jsonObject.getString("shareSource");
         String userCode =  jsonObject.getString("userId");
+        
+        //这里拒绝多余的请求，比如库存100，那么超过500或者1000的请求都可以拒绝掉，利用redis的原子自增
+        long count = redisRepository.incr("BM_MARKET_SECKILL_COUNT_" + stallActivityId);
+		if( count > 1000 ) {
+			SeckillInfoResponse response = new SeckillInfoResponse();
+			response.setIsSuccess(false);
+			response.setResponseCode(6405);
+			response.setResponseMsg( "活动太火爆，已经售罄啦！");
+			return response;
+		}
+		logger.info("第" + count + "个请求进入到了消息队列");
 		
 		return seckillService.startSeckill(stallActivityId, purchaseNum, openId, formId, addressId, shareCode, shareSource, userCode);
 	}
@@ -157,6 +168,12 @@ public class SeckillController {
 		if( redisRepository.exists("BM_MARKET_SECKILL_LIMIT_" + stallActivityId + "_" + openId) ) {
 			return new BaseResponse(false, 6105, "您正在参与该活动，不能重复购买！");
 		}
+		//这里拒绝多余的请求，比如库存100，那么超过500或者1000的请求都可以拒绝掉，利用redis的原子自增操作
+		long count = redisRepository.incr("BM_MARKET_SECKILL_COUNT_" + stallActivityId);
+		if( count > 1000 ) {
+			return new BaseResponse(false, 6405, "活动太火爆，已经售罄啦！");
+		}
+		logger.info("第" + count + "个请求进入到了消息队列");
 		//放入kafka消息队列
 		kafkaSender.sendChannelMess("demo_seckill_queue", jsonStr.toString());
 		return new BaseResponse();
