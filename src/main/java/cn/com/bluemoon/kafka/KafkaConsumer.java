@@ -3,6 +3,7 @@ package cn.com.bluemoon.kafka;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.connection.jedis.JedisConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
@@ -13,6 +14,7 @@ import cn.com.bluemoon.common.response.SeckillInfoResponse;
 import cn.com.bluemoon.redis.lock.DistributedExclusiveRedisLock;
 import cn.com.bluemoon.redis.repository.RedisRepository;
 import cn.com.bluemoon.utils.SerialNo;
+import redis.clients.jedis.Jedis;
 
 /**
  * 消费者 spring-kafka 2.0 + 依赖JDK8
@@ -26,6 +28,8 @@ public class KafkaConsumer {
 	private RedisRepository redisRepository;
 	@Autowired
 	private StringRedisTemplate redisTemplate;
+	@Autowired
+    private JedisConnectionFactory jedisConnectionFactory;
 	
     /**
      * 监听seckill主题,有消息就读取
@@ -53,7 +57,7 @@ public class KafkaConsumer {
 			//并将orderId_orderCode放入缓存，有效时间10分钟（因为支付有效时间为10分钟）
 			redisRepository.setExpire("BM_MARKET_SECKILL_ORDERID_" + stallActivityId + "_" + openId, orderCode, 600);
 			
-			DistributedExclusiveRedisLock lock = new DistributedExclusiveRedisLock(redisTemplate); //构造锁的时候需要带入RedisTemplate实例
+			DistributedExclusiveRedisLock lock = new DistributedExclusiveRedisLock(redisTemplate, (Jedis)jedisConnectionFactory.getConnection().getNativeConnection()); //构造锁的时候需要带入RedisTemplate实例
 			lock.setLockKey("marketOrder"+stallActivityId); //控制锁的颗粒度(摊位活动ID)
 			lock.setExpires(1L); //每次操作预计的超时时间,单位秒
 			try{
@@ -82,8 +86,7 @@ public class KafkaConsumer {
 //		String shareCode = json.getString("shareCode");
 //		String shareSource = json.getString("shareSource");
 //		String userCode = json.getString("userCode");
-		
-		DistributedExclusiveRedisLock lock = new DistributedExclusiveRedisLock(redisTemplate); //构造锁的时候需要带入RedisTemplate实例
+		DistributedExclusiveRedisLock lock = new DistributedExclusiveRedisLock(redisTemplate, (Jedis)jedisConnectionFactory.getConnection().getNativeConnection()); //构造锁的时候需要带入RedisTemplate实例
 		lock.setLockKey("marketOrder"+stallActivityId); //控制锁的颗粒度(摊位活动ID)
 		lock.setExpires(1L); //每次操作预计的超时时间,单位秒
 		try{

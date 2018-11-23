@@ -6,8 +6,10 @@ import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
 
 import cn.com.bluemoon.common.exception.IllegalReentrantException;
+import redis.clients.jedis.Jedis;
 
 import java.io.Serializable;
+import java.util.Collections;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
@@ -16,12 +18,15 @@ import java.util.concurrent.locks.Lock;
 /**
  * 不可重入分布式锁,基于redis实现
  * <p>
- * Created by Guoqing on 16/8/26.
+ * Created by Guoqing on 18/11/22.
+ * 变更了加锁与释放锁的过程，通过jedis的操作实现，防止出现死锁等问题
  */
 public class DistributedExclusiveRedisLock implements Lock, Serializable {
     private static final long serialVersionUID = -7118885188373628439L;
 
 	private RedisTemplate redisTemplate;
+	
+	private Jedis jedis;
 
     /**
      * 控制锁颗粒度的参数
@@ -29,6 +34,11 @@ public class DistributedExclusiveRedisLock implements Lock, Serializable {
      * 不建议使用全局锁,具体应用中推荐指定对应的Key,把锁的颗粒度减小,利于性能
      */
     private String lockKey = "distributed_global_lock";
+    
+    private static final String LOCK_SUCCESS = "OK";
+    private static final String SET_IF_NOT_EXIST = "NX";
+    private static final String SET_WITH_EXPIRE_TIME = "PX";
+    private static final Long RELEASE_SUCCESS = 1L;
 
     private String uuid;
 
@@ -37,13 +47,15 @@ public class DistributedExclusiveRedisLock implements Lock, Serializable {
     // 单位 默认10秒
     private long expires = 30L;
 
-    public DistributedExclusiveRedisLock(RedisTemplate template) {
+    public DistributedExclusiveRedisLock(RedisTemplate template, Jedis jedis) {
         this.redisTemplate = template;
+        this.jedis = jedis;
     }
 
-    public DistributedExclusiveRedisLock(RedisTemplate template, String lockKey) {
+    public DistributedExclusiveRedisLock(RedisTemplate template, String lockKey, Jedis jedis) {
         this.lockKey = lockKey;
         this.redisTemplate = template;
+        this.jedis = jedis;
     }
 
     /**
@@ -64,16 +76,14 @@ public class DistributedExclusiveRedisLock implements Lock, Serializable {
                 public Boolean doInRedis(RedisConnection connection) throws DataAccessException {
                     /*return connection.setNX(lockKey.getBytes(), uuid.getBytes())
                             && connection.expire(lockKey.getBytes(), expires);*/
-                	//return connection.setNX(lockKey.getBytes(), uuid.getBytes())
-                    //       && connection.expire(lockKey.getBytes(), expires);
-                	//2018-06-22 更新，setex操作替换setnx和expire的两步操作，解决了由于操作不具备原子性导致的死锁问题
-                	try {
-						connection.setEx(lockKey.getBytes(), expires,lockKey.getBytes());
-					} catch (Exception e) {
-						e.printStackTrace();
-						return false;
-					}
-                	return true;
+                	/**
+                	 * 更新了1.0版本中，setnx成功之后程序崩溃导致的死锁的问题
+                	 */
+                	String result = jedis.set(lockKey, uuid, SET_IF_NOT_EXIST, SET_WITH_EXPIRE_TIME, expires);
+                	if (LOCK_SUCCESS.equals(result)) {
+                        return true;
+                    }
+                    return false;
                 }
             });
             if (isAcquired)
@@ -109,22 +119,16 @@ public class DistributedExclusiveRedisLock implements Lock, Serializable {
      * <p>
      * 超时后的资源被释放掉,避免误删,这里务必校验uuid
      */
-    @SuppressWarnings("unchecked")
 	@Override
     public void unlock() {
-        if (!isOccupy)
+    	if (!isOccupy)
             return;
-        redisTemplate.execute(new RedisCallback<Boolean>() {
-            @Override
-            public Boolean doInRedis(RedisConnection connection) throws DataAccessException {
-                byte[] lockBytes = connection.get(lockKey.getBytes());
-                if (lockBytes != null && new String(lockBytes).equals(uuid)) {
-                    connection.del(lockKey.getBytes());
-                }
-                return true;
-            }
-        });
-        isOccupy = false;
+        String script = "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
+        Object result = jedis.eval(script, Collections.singletonList(lockKey), Collections.singletonList(uuid));
+
+        if (RELEASE_SUCCESS.equals(result)) {
+        	isOccupy = false;
+        }
     }
 
     @Override
