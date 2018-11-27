@@ -3,6 +3,7 @@ package cn.com.bluemoon.kafka;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.jedis.JedisConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -56,8 +57,8 @@ public class KafkaConsumer {
 			redisRepository.del("BM_MARKET_LOCK_POLLING_" + stallActivityId + "_" + openId);
 			//并将orderId_orderCode放入缓存，有效时间10分钟（因为支付有效时间为10分钟）
 			redisRepository.setExpire("BM_MARKET_SECKILL_ORDERID_" + stallActivityId + "_" + openId, orderCode, 600);
-			
-			DistributedExclusiveRedisLock lock = new DistributedExclusiveRedisLock(redisTemplate, (Jedis)jedisConnectionFactory.getConnection().getNativeConnection()); //构造锁的时候需要带入RedisTemplate实例
+			RedisConnection redisConnection = jedisConnectionFactory.getConnection();
+			DistributedExclusiveRedisLock lock = new DistributedExclusiveRedisLock(redisTemplate, (Jedis)redisConnection.getNativeConnection()); //构造锁的时候需要带入RedisTemplate实例
 			lock.setLockKey("marketOrder"+stallActivityId); //控制锁的颗粒度(摊位活动ID)
 			lock.setExpires(1L); //每次操作预计的超时时间,单位秒
 			try{
@@ -66,6 +67,7 @@ public class KafkaConsumer {
 				redisRepository.decrBy("BM_MARKET_SECKILL_REAL_STOCKNUM_" + stallActivityId, purchaseNum);
 			}finally{
 				lock.unlock();
+				redisConnection.close();
 			}
 		} catch (NumberFormatException e) {
 			e.printStackTrace();
@@ -86,7 +88,8 @@ public class KafkaConsumer {
 //		String shareCode = json.getString("shareCode");
 //		String shareSource = json.getString("shareSource");
 //		String userCode = json.getString("userCode");
-		DistributedExclusiveRedisLock lock = new DistributedExclusiveRedisLock(redisTemplate, (Jedis)jedisConnectionFactory.getConnection().getNativeConnection()); //构造锁的时候需要带入RedisTemplate实例
+		RedisConnection redisConnection = jedisConnectionFactory.getConnection();
+		DistributedExclusiveRedisLock lock = new DistributedExclusiveRedisLock(redisTemplate, (Jedis)redisConnection.getNativeConnection()); //构造锁的时候需要带入RedisTemplate实例
 		lock.setLockKey("marketOrder"+stallActivityId); //控制锁的颗粒度(摊位活动ID)
 		lock.setExpires(1L); //每次操作预计的超时时间,单位秒
 		try{
@@ -107,6 +110,8 @@ public class KafkaConsumer {
 				redisRepository.setExpire("BM_MARKET_SECKILL_QUALIFICATION_CODE_" + stallActivityId + "_" + openId, code, 10*60);
 				//维护一个key，防止获得下单资格用户重新抢购，当支付过期之后应该维护删除该标志
 				redisRepository.setExpire("BM_MARKET_SECKILL_LIMIT_" + stallActivityId + "_" + openId, "true", 3600*24*7);
+				//扣减锁定库存
+				redisRepository.decrBy("BM_MARKET_SECKILL_STOCKNUM_" + stallActivityId, purchaseNum);
 			}else {
 				response.setIsSuccess(false);
 				response.setResponseCode(6102);
@@ -118,6 +123,7 @@ public class KafkaConsumer {
 			redisRepository.setExpire("BM_MARKET_SECKILL_QUEUE_"+stallActivityId+"_"+openId, result.toJSONString(), 3600*24*7);
 		}finally{
 			lock.unlock();
+			redisConnection.close();
 		}
     }
     

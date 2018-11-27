@@ -1,9 +1,5 @@
 server:
   port: 8080
-  tomcat:
-    max-threads: 1000
-    accept-count: 1000
-    max-connections: 2000
   
 zookeeper:
   address: 192.168.240.15\:2181,192.168.240.15\:2182,192.168.240.15\:2183
@@ -34,9 +30,9 @@ spring:
     timeout: 0
     host: 192.168.240.36
     pool:
-      max-active: 50
-      max-wait: 3000
-      max-idle: 50
+      max-active: 8
+      max-wait: -1
+      max-idle: 8
       min-idle: 0
   datasource:
     write:

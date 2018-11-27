@@ -170,7 +170,7 @@ public class SeckillController {
 		}
 		//这里拒绝多余的请求，比如库存100，那么超过500或者1000的请求都可以拒绝掉，利用redis的原子自增操作
 		long count = redisRepository.incr("BM_MARKET_SECKILL_COUNT_" + stallActivityId);
-		if( count > 10000 ) {
+		if( count > 500 ) {
 			return new BaseResponse(false, 6405, "活动太火爆，已经售罄啦！");
 		}
 		logger.info("第" + count + "个请求进入到了消息队列");
