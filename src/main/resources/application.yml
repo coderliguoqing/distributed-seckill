@@ -71,6 +71,10 @@ spring:
       test-on-borrow: false
       test-on-return: false
       connectionProperties: druid.stat.mergeSql=true;druid.stat.slowSqlMillis=3000
+  mvc:
+    view:
+      prefix: /views/
+      suffix: .html
     
 mybatis:
   config-location:  classpath:mybatis-config.xml

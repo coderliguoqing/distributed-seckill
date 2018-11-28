@@ -240,9 +240,9 @@ public class SeckillController {
 			String result = redisRepository.get("BM_MARKET_SECKILL_QUEUE_"+stallActivityId+"_"+openId);
 			response = JSONObject.parseObject(JSONObject.parseObject(result).getJSONObject("response").toJSONString(), SeckillInfoResponse.class);
 		} else {
-			response.setIsSuccess(false);
-			response.setResponseCode(6102);
-			response.setResponseMsg("秒杀失败，商品已经售罄");
+			response.setIsSuccess(true);
+			response.setResponseCode(0);
+			response.setResponseMsg("活动太火爆，排队中...");
 			response.setRefreshTime(0);
 		}
 		return response;
