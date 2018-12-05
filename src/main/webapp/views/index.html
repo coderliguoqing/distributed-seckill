@@ -51,18 +51,6 @@ body>.el-container {
 					<el-form ref="form" :model="form" label-width="80px">
 						<el-row>
 							<el-col :span="18">
-								<el-form-item label="库存信息">
-									<el-input v-model="realStockNum"></el-input>
-								</el-form-item>
-							</el-col>
-							<el-col :span="6">
-								<el-form-item>
-									<el-button type="warning" @click.native="getStockNum">获取库存信息</el-button>
-								</el-form-item>
-							</el-col>
-						</el-row>
-						<el-row>
-							<el-col :span="18">
 								<el-form-item label="库存数量">
 									<el-input v-model="stockNum"></el-input>
 								</el-form-item>
@@ -70,6 +58,18 @@ body>.el-container {
 							<el-col :span="6">
 								<el-form-item>
 									<el-button type="primary" @click.native="setStockNum">设置库存</el-button>
+								</el-form-item>
+							</el-col>
+						</el-row>
+						<el-row>
+							<el-col :span="18">
+								<el-form-item label="库存信息">
+									<el-input v-model="realStockNum"></el-input>
+								</el-form-item>
+							</el-col>
+							<el-col :span="6">
+								<el-form-item>
+									<el-button type="warning" @click.native="getStockNum">获取库存信息</el-button>
 								</el-form-item>
 							</el-col>
 						</el-row>
@@ -108,7 +108,7 @@ body>.el-container {
       el: '#app',
       data: function() {
         return { 
-          stallActivityId: 1,
+          stallActivityId: 11,
           form: {},
           stockNum: 50,
           realStockNum: '',
@@ -224,7 +224,7 @@ body>.el-container {
    		         async: true,
    		         success:function(data){
    			         if( data.isSuccess == true ){
-  			        	this.message += "恭喜您，下单成功！";
+  			        	this.message += "恭喜您，下单成功！ <br/>";
    			         }else{
    			        	this.message += data.responseMsg + "<br/>";
    			         }

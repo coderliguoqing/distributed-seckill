@@ -11,6 +11,7 @@ package cn.com.bluemoon.service.impl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.jedis.JedisConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -59,7 +60,8 @@ public class SeckillServiceImpl implements ISeckillService {
 			return response;
 		}
 		logger.info("开始获取锁资源...");
-		DistributedExclusiveRedisLock lock = new DistributedExclusiveRedisLock(redisTemplate, (Jedis)jedisConnectionFactory.getConnection().getNativeConnection()); //构造锁的时候需要带入RedisTemplate实例
+		RedisConnection redisConnection = jedisConnectionFactory.getConnection();
+		DistributedExclusiveRedisLock lock = new DistributedExclusiveRedisLock(redisTemplate, (Jedis)redisConnection.getNativeConnection()); //构造锁的时候需要带入RedisTemplate实例
 		lock.setLockKey("BM_MARKET_SECKILL_" + stallActivityId);		//控制锁的颗粒度
 		lock.setExpires(2L);	//每次操作预计的超时时间,单位秒
 		try {
@@ -134,6 +136,7 @@ public class SeckillServiceImpl implements ISeckillService {
 		} finally {
 			logger.info("开始释放锁资源...");
 			lock.unlock();  //释放锁
+			redisConnection.close();
 		}
 		return response;
 	}

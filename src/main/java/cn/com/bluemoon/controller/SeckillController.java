@@ -164,16 +164,16 @@ public class SeckillController {
 		if( !seckillService.checkStartSeckill(stallActivityId) ) {
 			return new BaseResponse(false, 6205, "秒杀活动尚未开始，请稍等！");
 		}
-		//做用户重复购买校验
-		if( redisRepository.exists("BM_MARKET_SECKILL_LIMIT_" + stallActivityId + "_" + openId) ) {
-			return new BaseResponse(false, 6105, "您正在参与该活动，不能重复购买！");
-		}
 		//这里拒绝多余的请求，比如库存100，那么超过500或者1000的请求都可以拒绝掉，利用redis的原子自增操作
 		long count = redisRepository.incr("BM_MARKET_SECKILL_COUNT_" + stallActivityId);
 		if( count > 500 ) {
 			return new BaseResponse(false, 6405, "活动太火爆，已经售罄啦！");
 		}
 		logger.info("第" + count + "个请求进入到了消息队列");
+		//做用户重复购买校验
+		if( redisRepository.exists("BM_MARKET_SECKILL_LIMIT_" + stallActivityId + "_" + openId) ) {
+			return new BaseResponse(false, 6105, "您正在参与该活动，不能重复购买！");
+		}
 		//放入kafka消息队列
 		kafkaSender.sendChannelMess("demo_seckill_queue", jsonStr.toString());
 		return new BaseResponse();
