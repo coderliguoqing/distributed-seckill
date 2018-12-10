@@ -23,6 +23,7 @@ public enum WebExceptionEnum implements ServiceExceptionEnum{
 	 * 错误的请求
 	 */
 	REQUEST_NULL(false, 400, "请求有错误"),
+	REQUEST_LIMIT(false, 400, "请求已达上限"),
 	SERVER_ERROR(false, 500, "服务器异常"),
 	TOKEN_NOT_FUND(false, 401, "未授权"),
 	TOKEN_ERROR(false, 700, "token验证失败");
