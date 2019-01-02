@@ -95,6 +95,6 @@ SpringCloud zuul的层面有很好的限流策略，可以防止同一用户的�
 
 这里也顺带介绍redis可以采用redis cluster的分布式实现方案，同时springcloud hystrix 也能有服务容错的效果；
 
-而关于nxinx、springboot的tomcat、zuul等一系列参数优化操作对于性能的访问提升也是至关重要；
+而关于nginx、springboot的tomcat、zuul等一系列参数优化操作对于性能的访问提升也是至关重要；
 
 补充说明一点，即使前端是基于小程序实现，但是活动相关的图片资源都放在自己的云盘服务上，所以活动前活动相关的图片资源上传CDN也是至关重要，否则哪怕是你IDC有1G的流量带宽，也会分分钟被吃完；
