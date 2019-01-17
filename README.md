@@ -63,7 +63,7 @@
 #### 关于限流
 
 SpringCloud zuul的层面有很好的限流策略，可以防止同一用户的恶意请求行为
-
+```
  1 zuul:
  2     ratelimit:
  3         key-prefix: your-prefix  #对应用来标识请求的key的前缀
@@ -87,7 +87,7 @@ SpringCloud zuul的层面有很好的限流策略，可以防止同一用户的�
 21                           - user
 22                           - origin
 23                           - url
- 
+```
 
 #### 关于负载与分流
 
