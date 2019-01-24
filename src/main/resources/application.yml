@@ -6,7 +6,7 @@ server:
     max-connections: 2000
   
 zookeeper:
-  address: 192.168.0.15\:2181,192.168.0.15\:2182,192.168.0.15\:2183
+  address: 192.168.240.15\:2181,192.168.240.15\:2182,192.168.240.15\:2183
   
 spring:
   application:
@@ -15,9 +15,9 @@ spring:
     store-type: none
   kafka:
     bootstrap-servers:
-    - 192.168.0.42:9092
-    - 192.168.0.43:9092
-    - 192.168.0.44:9092
+    - 192.168.240.42:9092
+    - 192.168.240.43:9092
+    - 192.168.240.44:9092
     consumer:
       group-id: 0
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
@@ -30,13 +30,16 @@ spring:
   redis:
     database: 0
     port: 6379
-    password: dXzMHN2MaHUX
-    timeout: 0
-    host: 192.168.240.36
+#    password: dXzMHN2MaHUX
+    password: Mon56BuEcClust
+    timeout: 3000
+#    host: 192.168.240.36
+    cluster:
+      nodes: 192.168.234.18:6579,192.168.234.28:6579,192.168.234.29:6579,192.168.234.30:6579,192.168.234.6:6579,192.168.234.43:6579
     pool:
-      max-active: 50
+      max-active: 8
       max-wait: 3000
-      max-idle: 50
+      max-idle: 8
       min-idle: 0
   datasource:
     write:
@@ -79,4 +82,5 @@ spring:
 mybatis:
   config-location:  classpath:mybatis-config.xml
   mapper-locations: classpath:mapper/*.xml
+ 
   

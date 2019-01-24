@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -24,6 +25,7 @@ import cn.com.bluemoon.common.response.BaseResponse;
 import cn.com.bluemoon.common.response.SeckillInfoResponse;
 import cn.com.bluemoon.common.response.StockNumResponse;
 import cn.com.bluemoon.kafka.KafkaSender;
+import cn.com.bluemoon.redis.lock.RedissonDistributedLocker;
 import cn.com.bluemoon.redis.repository.RedisRepository;
 import cn.com.bluemoon.service.ISeckillService;
 import cn.com.bluemoon.utils.AssertUtil;
@@ -49,6 +51,8 @@ public class SeckillController {
 	private ISeckillService seckillService;
 	@Autowired
 	private KafkaSender kafkaSender;
+	@Autowired
+	private RedissonDistributedLocker redissonDistributedLocker;
 
 	Logger logger = LoggerFactory.getLogger(SeckillController.class);
 	
@@ -271,5 +275,38 @@ public class SeckillController {
 			//走后续的下单流程，并校验真实库存；该接口的流量已经是与真实库存几乎相匹配的流量值，按理不应该存在超高并发
 			return new BaseResponse();
 		}
+	}
+	
+	@ApiOperation(value="test",nickname="Guoqing")
+	@GetMapping(value="/test")
+	public void test() throws InterruptedException {
+		final int[] counter = {0};
+
+        for (int i= 0; i < 100; i++){
+        
+        	new Thread(new Runnable() {
+
+                @Override
+
+                public void run() {
+                	boolean isGetLock = redissonDistributedLocker.tryLock("test0001", 3L, 1L);
+                	if(isGetLock) {
+                		try {
+							int a = counter[0];
+							counter[0] = a + 1;
+							logger.info(a + "");
+						} finally {
+							redissonDistributedLocker.unlock("test0001");
+						}
+                	}
+                }
+            }).start();
+        	
+        }
+
+        // 主线程休眠，等待结果
+        Thread.sleep(5000);
+        System.out.println(counter[0]);
+        logger.info(counter[0] + "");
 	}
 }

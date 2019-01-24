@@ -3,8 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <!-- import CSS -->
-<link rel="stylesheet"
-	href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+<link rel="stylesheet" href="../css/index.css">
 <style>
 .el-header, .el-footer {
 	background-color: #B3C0D1;
@@ -39,10 +38,13 @@ body>.el-container {
 .el-container:nth-child(7) .el-aside {
 	line-height: 320px;
 }
+[v-cloak]{
+	display: none;
+}
 </style>
 </head>
 <body>
-	<div id="app">
+	<div id="app" v-cloak>
 		<el-container>
 			<el-header>分布式秒杀测试</el-header>
 			<el-container>
@@ -99,9 +101,9 @@ body>.el-container {
 	</div>
 </body>
 <!-- import Vue before Element -->
-<script src="https://unpkg.com/vue/dist/vue.js"></script>
+<script src="../js/vue.js"></script>
 <!-- import JavaScript -->
-<script src="https://unpkg.com/element-ui/lib/index.js"></script>
+<script src="../js/index.js"></script>
 <script src="../js/jquery-1.9.1.min.js" type="text/javascript"></script>
 <script>
     new Vue({

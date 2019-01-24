@@ -11,9 +11,6 @@ package cn.com.bluemoon.service.impl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.connection.RedisConnection;
-import org.springframework.data.redis.connection.jedis.JedisConnectionFactory;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,10 +18,9 @@ import com.alibaba.fastjson.JSONObject;
 
 import cn.com.bluemoon.common.response.SeckillInfoResponse;
 import cn.com.bluemoon.kafka.KafkaSender;
-import cn.com.bluemoon.redis.lock.DistributedExclusiveRedisLock;
+import cn.com.bluemoon.redis.lock.RedissonDistributedLocker;
 import cn.com.bluemoon.redis.repository.RedisRepository;
 import cn.com.bluemoon.service.ISeckillService;
-import redis.clients.jedis.Jedis;
 
 /**  
 * <p>Title: SeckillServiceImpl</p>  
@@ -38,11 +34,9 @@ public class SeckillServiceImpl implements ISeckillService {
 	@Autowired
 	private RedisRepository redisRepository;
 	@Autowired
-	private StringRedisTemplate redisTemplate;
-	@Autowired
 	private KafkaSender kafkaSender;
 	@Autowired
-    private JedisConnectionFactory jedisConnectionFactory;
+	private RedissonDistributedLocker redissonDistributedLocker;
 	
 	private Logger logger = LoggerFactory.getLogger(SeckillServiceImpl.class);
 
@@ -60,12 +54,9 @@ public class SeckillServiceImpl implements ISeckillService {
 			return response;
 		}
 		logger.info("开始获取锁资源...");
-		RedisConnection redisConnection = jedisConnectionFactory.getConnection();
-		DistributedExclusiveRedisLock lock = new DistributedExclusiveRedisLock(redisTemplate, (Jedis)redisConnection.getNativeConnection()); //构造锁的时候需要带入RedisTemplate实例
-		lock.setLockKey("BM_MARKET_SECKILL_" + stallActivityId);		//控制锁的颗粒度
-		lock.setExpires(2L);	//每次操作预计的超时时间,单位秒
+		String lockKey = "BM_MARKET_SECKILL_" + stallActivityId;
 		try {
-			lock.lock();    //获取锁
+			redissonDistributedLocker.lock(lockKey, 2L);
 			logger.info("获取到锁资源...");
 			//做用户重复购买校验
 			if( redisRepository.exists("BM_MARKET_SECKILL_LIMIT_" + stallActivityId + "_" + openId) ) {
@@ -135,8 +126,7 @@ public class SeckillServiceImpl implements ISeckillService {
 			response.setRefreshTime(0);
 		} finally {
 			logger.info("开始释放锁资源...");
-			lock.unlock();  //释放锁
-			redisConnection.close();
+			redissonDistributedLocker.unlock(lockKey);  //释放锁
 		}
 		return response;
 	}
