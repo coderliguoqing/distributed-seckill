@@ -57,7 +57,11 @@ public class CallableAndFuture2 {
 		public Object call() throws Exception {
 			System.out.println(">>>" + taskNum + "任务启动");
 			long startTime = System.currentTimeMillis();
-			Thread.sleep(1000);
+			if("1".equals(taskNum)) {
+				Thread.sleep(1500);
+			}else {
+				Thread.sleep(1000);
+			}
 			long endTime = System.currentTimeMillis();
 			System.out.println(">>>" + taskNum + "任务终止");
 			return taskNum + "任务返回运行结果，当前任务运行时间【" + (endTime - startTime) + "毫秒】";

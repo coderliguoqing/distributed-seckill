@@ -30,6 +30,7 @@ import cn.com.bluemoon.redis.repository.RedisRepository;
 import cn.com.bluemoon.service.ISeckillService;
 import cn.com.bluemoon.utils.AssertUtil;
 import cn.com.bluemoon.utils.StringUtil;
+import cn.hutool.system.SystemUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 
@@ -282,7 +283,7 @@ public class SeckillController {
 	public void test() throws InterruptedException {
 		final int[] counter = {0};
 
-        for (int i= 0; i < 100; i++){
+        for (int i= 0; i < 300; i++){
         
         	new Thread(new Runnable() {
 
@@ -290,6 +291,7 @@ public class SeckillController {
 
                 public void run() {
                 	boolean isGetLock = redissonDistributedLocker.tryLock("test0001", 3L, 1L);
+                	logger.info(isGetLock + "");
                 	if(isGetLock) {
                 		try {
 							int a = counter[0];
@@ -305,8 +307,48 @@ public class SeckillController {
         }
 
         // 主线程休眠，等待结果
-        Thread.sleep(5000);
-        System.out.println(counter[0]);
+        Thread.sleep(10000);
         logger.info(counter[0] + "");
+	}
+	
+	@ApiOperation(value="test1",nickname="Guoqing")
+	@GetMapping(value="/test1")
+	public void test1() throws InterruptedException {
+		final int[] counter = {0};
+
+        for (int i= 0; i < 100; i++){
+        
+        	new Thread(new Runnable() {
+
+                @Override
+
+                public void run() {
+            		try {
+            			redissonDistributedLocker.lock("test0002", 1L);
+            			logger.info(redissonDistributedLocker.isLocked("test0002") + "");
+						int a = counter[0];
+						counter[0] = a + 1;
+						logger.info(a + "");
+					} finally {
+						redissonDistributedLocker.unlock("test0002");
+					}
+                }
+            }).start();
+        	
+        }
+
+        // 主线程休眠，等待结果
+        Thread.sleep(10000);
+        logger.info(counter[0] + "");
+	}
+	
+	@ApiOperation(value="test2",nickname="Guoqing")
+	@GetMapping(value="/test2")
+	public void test2() throws InterruptedException {
+		logger.info(SystemUtil.getJavaRuntimeInfo().toString());
+		logger.info(SystemUtil.getJavaInfo().toString());
+		logger.info(SystemUtil.getJvmInfo().toString());
+		logger.info(SystemUtil.getJavaSpecInfo().toString());
+		logger.info(SystemUtil.getRuntimeInfo().toString());
 	}
 }

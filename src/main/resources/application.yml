@@ -29,13 +29,13 @@ spring:
       buffer-memory: 524288
   redis:
     database: 0
-    port: 6379
+    port: 56379
 #    password: dXzMHN2MaHUX
-    password: Mon56BuEcClust
+    password: Mon56BuEcXzZ
     timeout: 3000
-#    host: 192.168.240.36
-    cluster:
-      nodes: 192.168.234.18:6579,192.168.234.28:6579,192.168.234.29:6579,192.168.234.30:6579,192.168.234.6:6579,192.168.234.43:6579
+    host: 192.168.234.33
+#    cluster:
+#      nodes: 192.168.234.18:6579,192.168.234.28:6579,192.168.234.29:6579,192.168.234.30:6579,192.168.234.6:6579,192.168.234.43:6579
     pool:
       max-active: 8
       max-wait: 3000
